@@ -1,0 +1,26 @@
+{
+  "name": "mem-pool",
+  "version": "0.0.0",
+  "description": "Shared Memory for Node.js via Boost Interprocess (exp)",
+  "main": "test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/liuyanghejerry/mem-pool.git"
+  },
+  "keywords": [
+    "shared",
+    "memory",
+    "mem-pool"
+  ],
+  "author": "liuyanghejerry",
+  "license": "MIT",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/liuyanghejerry/mem-pool/issues"
+  },
+  "homepage": "https://github.com/liuyanghejerry/mem-pool"
+}
