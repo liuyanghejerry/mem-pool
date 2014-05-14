@@ -5,7 +5,8 @@
 using namespace v8;
 
 void InitAll(Handle<Object> exports) {
-  SharedMemory::Init(exports);
+    MemorySlice::Init(exports);
+    SharedMemory::Init(exports);
 }
 
 NODE_MODULE(addon, InitAll)

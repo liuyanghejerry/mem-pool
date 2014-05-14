@@ -1,28 +1,41 @@
 #define BUILDING_NODE_EXTENSION
 #include <node.h>
 #include <node_buffer.h>
-#include <boost/interprocess/mapped_region.hpp>
 #include "SharedMemory.h"
+#include "common.h"
 
 using namespace v8;
 using node::Buffer;
 
 Persistent<Function> SharedMemory::constructor;
 
-SharedMemory::SharedMemory(Local<String> name, Local<Boolean> no_create) :
+SharedMemory::SharedMemory(Local<String> name,
+                           Local<Integer> open_mode,
+                           Local<Integer> access_mode) :
     shm_(NULL)
 {
-    if(no_create->Value()) {
+    common::OPEN_MODE m = (common::OPEN_MODE)open_mode->Value();
+    common::ACCESS_MODE m2 = (common::ACCESS_MODE)access_mode->Value();
+    boost::interprocess::mode_t a_m = common::toAccessMode(m2);
+
+    switch(m){
+    default: // fall-through
+    case common::OPEN_ONLY:
         shm_ = new shared_memory_object(open_only,
                                         *(String::Utf8Value(name)),
-                                        read_write);
-    } else {
-//        shared_memory_object::remove(*(String::Utf8Value(name)));
+                                        a_m);
+        break;
+    case common::CREATE_ONLY:
+        shm_ = new shared_memory_object(create_only,
+                                        *(String::Utf8Value(name)),
+                                        a_m);
+        break;
+    case common::OPEN_OR_CREATE:
         shm_ = new shared_memory_object(open_or_create,
                                         *(String::Utf8Value(name)),
-                                        read_write);
+                                        a_m);
+        break;
     }
-
 }
 
 SharedMemory::~SharedMemory()
@@ -47,11 +60,18 @@ void SharedMemory::recycle()
     shared_memory_object::remove(shm_->get_name());
 }
 
+MemorySlice* SharedMemory::slice(offset_t ofst, size_t si, common::ACCESS_MODE mo)
+{
+    return new MemorySlice(*shm_, ofst, si, mo);
+}
+
+
 void SharedMemory::Init(Handle<Object> exports) {
     // Prepare constructor template
     Local<FunctionTemplate> tpl = FunctionTemplate::New(New);
     tpl->SetClassName(String::NewSymbol("SharedMemory"));
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
     // Prototype
     tpl->PrototypeTemplate()->Set(String::NewSymbol("truncate"),
                                   FunctionTemplate::New(Truncate)->GetFunction());
@@ -59,6 +79,11 @@ void SharedMemory::Init(Handle<Object> exports) {
                                   FunctionTemplate::New(Whole)->GetFunction());
     tpl->PrototypeTemplate()->Set(String::NewSymbol("recycle"),
                                   FunctionTemplate::New(Recycle)->GetFunction());
+    tpl->PrototypeTemplate()->Set(String::NewSymbol("slice"),
+                                  FunctionTemplate::New(Slice)->GetFunction());
+    tpl->PrototypeTemplate()->Set(String::NewSymbol("size"),
+                                  FunctionTemplate::New(Size)->GetFunction());
+
     constructor = Persistent<Function>::New(tpl->GetFunction());
     exports->Set(String::NewSymbol("SharedMemory"), constructor);
 }
@@ -69,14 +94,17 @@ Handle<Value> SharedMemory::New(const Arguments& args) {
     if (args.IsConstructCall()) {
         // Invoked as constructor: `new SharedMemory(...)`
         Local<String> name = args[0]->IsUndefined() ? String::New("shared_memory") : args[0]->ToString();
-        Local<Boolean> open_only = args[1]->IsUndefined() ? Local<Boolean>::New(True()) :  Local<Boolean>::New(args[1]->ToBoolean());
-        SharedMemory* obj = new SharedMemory(name, open_only);
+        Local<Integer> open_mode = args[1]->IsUndefined() ? Integer::New(0) :  Local<Integer>::New(args[1]->ToNumber()->ToInteger());
+        Local<Integer> access_mode = args[2]->IsUndefined() ? Integer::New(0) :  Local<Integer>::New(args[2]->ToNumber()->ToInteger());
+
+        SharedMemory* obj = new SharedMemory(name, open_mode, access_mode);
+
         obj->Wrap(args.This());
         return args.This();
     } else {
         // Invoked as plain function `SharedMemory(...)`, turn into construct call.
-        const int argc = 1;
-        Local<Value> argv[argc] = { args[0] };
+        const int argc = 3;
+        Local<Value> argv[argc] = { args[0], args[1], args[2] };
         return scope.Close(constructor->NewInstance(argc, argv));
     }
 }
@@ -94,7 +122,8 @@ Handle<Value> SharedMemory::Whole(const Arguments &args)
 {
     HandleScope scope;
     SharedMemory* obj = ObjectWrap::Unwrap<SharedMemory>(args.This());
-    MemorySlice* slice = new MemorySlice(*(obj->shm_), 0, obj->size());
+    // FIXME: leaks
+    MemorySlice* slice = obj->slice(0, obj->size(), common::READ_WRITE);
     return slice->buffer();
 }
 
@@ -106,54 +135,26 @@ Handle<Value> SharedMemory::Recycle(const Arguments &args)
     return scope.Close(Undefined());
 }
 
-
-MemorySlice::MemorySlice(shared_memory_object &shm,
-                         std::size_t offset,
-                         std::size_t length):
-    region_(new mapped_region(shm,
-                              read_write,
-                              offset,
-                              length))
-{
-}
-
-MemorySlice::~MemorySlice()
-{
-    delete region_;
-}
-
-void *MemorySlice::getAddress() const
-{
-    return region_->get_address();
-}
-
-std::size_t MemorySlice::size() const
-{
-    return region_->get_size();
-}
-
-Local<Object> MemorySlice::buffer()
-{
-    return toJsBuffer(toBuffer());
-}
-
-void dummy_free_callback(char *, void *)
-{
-    return;
-}
-
-Buffer *MemorySlice::toBuffer()
-{
-    return Buffer::New((char*)getAddress(), size(), dummy_free_callback, NULL);
-}
-
-Local<Object> MemorySlice::toJsBuffer(Buffer *slowBuffer)
+Handle<Value> SharedMemory::Slice(const Arguments &args)
 {
     HandleScope scope;
-    Local<Object> globalObj = Context::GetCurrent()->Global();
-    Local<Function> bufferConstructor = Local<Function>::Cast(globalObj->Get(String::New("Buffer")));
 
-    Handle<Value> constructorArgs[3] = { slowBuffer->handle_, Integer::New(this->size()), Integer::New(0) };
-    Local<Object> actualBuffer = bufferConstructor->NewInstance(3, constructorArgs);
-    return actualBuffer;
+    Local<Object> globalObj = Context::GetCurrent()->Global();
+    Local<Function> sliceConstructor = Local<Function>::Cast(globalObj->Get(String::New("MemorySlice")));
+
+    Handle<Value> constructorArgs[4] = { args.This(),
+                                         args[0],
+                                         args[1],
+                                         args[2] };
+    Local<Object> sliceObj = sliceConstructor->NewInstance(4, constructorArgs);
+
+    return scope.Close(sliceObj);
+}
+
+v8::Handle<v8::Value> SharedMemory::Size(const v8::Arguments &args)
+{
+    HandleScope scope;
+
+    SharedMemory* obj = ObjectWrap::Unwrap<SharedMemory>(args.This());
+    return scope.Close(Number::New(obj->size()));
 }

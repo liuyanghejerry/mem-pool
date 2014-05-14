@@ -2,8 +2,9 @@
   "targets": [
     {
       "target_name": "addon",
-      "cflags!": [ "-fno-exceptions", "-fpermissive" ],
-      "cflags_cc!": [ "-fno-exceptions", "-fpermissive" ],
+      "cxxflags": ["-std=c++0x"],
+      "cflags!": [ "-fno-exceptions" ],
+      "cflags_cc!": [ "-fno-exceptions" ],
       'conditions': [
         ['OS=="mac"', {
           'xcode_settings': {
@@ -14,7 +15,7 @@
       "ldflags": [
         "-lrt"
       ],
-      "sources": [ "addon.cc", "SharedMemory.cc" ],
+      "sources": [ "addon.cc", "MemorySlice.cc", "SharedMemory.cc" ],
     }
   ]
 }

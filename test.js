@@ -3,17 +3,12 @@ var addon = require('./build/Release/addon');
 
 if (cluster.isMaster) {
 	(function() {
-		var obj = new addon.SharedMemory("test_memory_12", false);
-		console.log( obj.truncate(10240000) ); 
-		var buf = obj.whole();
-		console.time('fill, remote');
-		buf.fill("hi");
-		console.timeEnd('fill, remote');
-		console.log('master:', buf); 
-		var local_buf = new Buffer(10240000);
-		console.time('fill, local');
-		local_buf.fill('hi');
-		console.timeEnd('fill, local');
+		var obj = new addon.SharedMemory("test_memory_12", 0x3, 0x3);
+		console.log( obj.truncate(1024) ); 
+		var slice = obj.slice(0, obj.size(), 0x3);
+		console.log(slice);
+		// var buf = slice.buffer();
+		// console.log(buf);
 
 		require('http').createServer(function (req, res) {
 		  res.writeHead(200, {'Content-Type': 'text/plain'});
@@ -26,10 +21,9 @@ if (cluster.isMaster) {
 	})();
 	
 } else {
-	(function() {
-		var obj = new addon.SharedMemory("test_memory_12", true);
-		var buf = obj.whole();
-		console.log('cluster:', buf); 
-	})();
+	// (function() {
+	// 	var obj = new addon.SharedMemory("test_memory_12", 0x1, 0x1);
+	// 	// var buf = obj.whole();
+	// 	// console.log('cluster:', buf); 
+	// })();
 }
-
