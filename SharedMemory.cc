@@ -3,6 +3,7 @@
 #include <node_buffer.h>
 #include "SharedMemory.h"
 #include "common.h"
+#include <iostream>
 
 using namespace v8;
 using node::Buffer;
@@ -143,6 +144,7 @@ Handle<Value> SharedMemory::Slice(const Arguments &args)
                                          args[0],
                                          args[1],
                                          args[2] };
+
     return scope.Close(MemorySlice::NewInstance(4, constructorArgs));
 }
 

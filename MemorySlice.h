@@ -26,7 +26,6 @@ public:
     void * getAddress() const;
     std::size_t size() const;
     v8::Local<v8::Object> buffer();
-    v8::Local<v8::Object> object(v8::Local<v8::Object> handle);
 private:
     static v8::Handle<v8::Value> New(const v8::Arguments& args);
     static v8::Handle<v8::Value> GetBuffer(const v8::Arguments &args);

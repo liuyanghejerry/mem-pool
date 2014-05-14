@@ -5,6 +5,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include "MemorySlice.h"
 #include "SharedMemory.h"
+#include <iostream>
 
 using namespace v8;
 using node::Buffer;
@@ -60,8 +61,8 @@ Handle<Value> MemorySlice::New(const Arguments& args) {
             throw;
         }
 
-        offset_t offset_arg = args[1]->IsUndefined() ? 0 :  args[0]->ToNumber()->ToInteger()->Value();
-        size_t size_arg = args[2]->IsUndefined() ? shared_memory->size() :  args[1]->ToNumber()->ToInteger()->Value();
+        offset_t offset_arg = args[1]->IsUndefined() ? 0 :  args[1]->ToNumber()->ToInteger()->Value();
+        size_t size_arg = args[2]->IsUndefined() ? shared_memory->size() :  args[2]->ToNumber()->ToInteger()->Value();
         common::ACCESS_MODE mode_arg = args[3]->IsUndefined() ? common::READ :  common::ACCESS_MODE(args[3]->ToNumber()->ToInteger()->Value());
 
         MemorySlice* obj = shared_memory->slice(offset_arg, size_arg, mode_arg);
@@ -125,13 +126,6 @@ Local<Object> MemorySlice::buffer()
 {
     Buffer* buf = Buffer::New((char*)getAddress(), size(), dummy_free_callback, NULL);
     return toJsBuffer(buf);
-}
-
-Local<v8::Object> MemorySlice::object(v8::Local<v8::Object> handle)
-{
-    // FIXME: result in empty Object
-    this->Wrap(handle);
-    return handle;
 }
 
 Local<Object> MemorySlice::toJsBuffer(Buffer *slowBuffer)
