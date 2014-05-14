@@ -139,16 +139,11 @@ Handle<Value> SharedMemory::Slice(const Arguments &args)
 {
     HandleScope scope;
 
-    Local<Object> globalObj = Context::GetCurrent()->Global();
-    Local<Function> sliceConstructor = Local<Function>::Cast(globalObj->Get(String::New("MemorySlice")));
-
     Handle<Value> constructorArgs[4] = { args.This(),
                                          args[0],
                                          args[1],
                                          args[2] };
-    Local<Object> sliceObj = sliceConstructor->NewInstance(4, constructorArgs);
-
-    return scope.Close(sliceObj);
+    return scope.Close(MemorySlice::NewInstance(4, constructorArgs));
 }
 
 v8::Handle<v8::Value> SharedMemory::Size(const v8::Arguments &args)

@@ -4,11 +4,11 @@ var addon = require('./build/Release/addon');
 if (cluster.isMaster) {
 	(function() {
 		var obj = new addon.SharedMemory("test_memory_12", 0x3, 0x3);
-		console.log( obj.truncate(1024) ); 
-		var slice = obj.slice(0, obj.size(), 0x3);
-		console.log(slice);
-		// var buf = slice.buffer();
-		// console.log(buf);
+		console.log( obj.truncate(1024) );
+		var slice = obj.slice(0, 200, 0x3);
+		console.log(slice.size());
+		var buf = slice.buffer();
+		console.log(buf.length);
 
 		require('http').createServer(function (req, res) {
 		  res.writeHead(200, {'Content-Type': 'text/plain'});

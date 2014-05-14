@@ -21,36 +21,59 @@ void MemorySlice::Init(v8::Handle<v8::Object> exports)
     // Prototype
     tpl->PrototypeTemplate()->Set(String::NewSymbol("buffer"),
                                   FunctionTemplate::New(GetBuffer)->GetFunction());
+    tpl->PrototypeTemplate()->Set(String::NewSymbol("size"),
+                                  FunctionTemplate::New(Size)->GetFunction());
 
     constructor = Persistent<Function>::New(tpl->GetFunction());
     exports->Set(String::NewSymbol("MemorySlice"), constructor);
 }
 
+v8::Handle<v8::Value> MemorySlice::NewInstance(const v8::Arguments &args)
+{
+    HandleScope scope;
+
+    const unsigned argc = 4;
+    Handle<Value> argv[argc] = { args[0], args[1], args[2], args[3] };
+    Local<Object> instance = constructor->NewInstance(argc, argv);
+
+    return scope.Close(instance);
+}
+
+v8::Handle<v8::Value> MemorySlice::NewInstance(int constructorArgc, Handle<Value>* constructorArgv)
+{
+    HandleScope scope;
+
+    Local<Object> instance = constructor->NewInstance(constructorArgc, constructorArgv);
+
+    return scope.Close(instance);
+}
+
 Handle<Value> MemorySlice::New(const Arguments& args) {
-  HandleScope scope;
+    HandleScope scope;
 
-  if (args.IsConstructCall()) {
-    // Invoked as constructor: `new MyObject(...)`
-    Handle<Object> shared_memory_js = args[0]->ToObject();
-    SharedMemory* shared_memory = ObjectWrap::Unwrap<SharedMemory>(shared_memory_js);
-    if(!shared_memory){
-        throw;
+    if (args.IsConstructCall()) {
+        // Invoked as constructor: `new MyObject(...)`
+        Handle<Object> shared_memory_js = args[0]->ToObject();
+        SharedMemory* shared_memory = ObjectWrap::Unwrap<SharedMemory>(shared_memory_js);
+        // TODO
+        if(!shared_memory){
+            throw;
+        }
+
+        offset_t offset_arg = args[1]->IsUndefined() ? 0 :  args[0]->ToNumber()->ToInteger()->Value();
+        size_t size_arg = args[2]->IsUndefined() ? shared_memory->size() :  args[1]->ToNumber()->ToInteger()->Value();
+        common::ACCESS_MODE mode_arg = args[3]->IsUndefined() ? common::READ :  common::ACCESS_MODE(args[3]->ToNumber()->ToInteger()->Value());
+
+        MemorySlice* obj = shared_memory->slice(offset_arg, size_arg, mode_arg);
+
+        obj->Wrap(args.This());
+        return args.This();
+    } else {
+        // Invoked as plain function `MyObject(...)`, turn into construct call.
+        const int argc = 4;
+        Local<Value> argv[argc] = { args[0], args[1], args[2], args[3] };
+        return scope.Close(constructor->NewInstance(argc, argv));
     }
-
-    offset_t offset_arg = args[1]->IsUndefined() ? 0 :  args[0]->ToNumber()->ToInteger()->Value();
-    size_t size_arg = args[2]->IsUndefined() ? shared_memory->size() :  args[1]->ToNumber()->ToInteger()->Value();
-    common::ACCESS_MODE mode_arg = args[3]->IsUndefined() ? common::READ :  common::ACCESS_MODE(args[3]->ToNumber()->ToInteger()->Value());
-
-    MemorySlice* obj = shared_memory->slice(offset_arg, size_arg, mode_arg);
-
-    obj->Wrap(args.This());
-    return args.This();
-  } else {
-    // Invoked as plain function `MyObject(...)`, turn into construct call.
-    const int argc = 4;
-    Local<Value> argv[argc] = { args[0], args[1], args[2], args[3] };
-    return scope.Close(constructor->NewInstance(argc, argv));
-  }
 }
 
 MemorySlice::MemorySlice(shared_memory_object &shm,
@@ -91,6 +114,13 @@ Handle<Value> MemorySlice::GetBuffer(const Arguments &args)
     return scope.Close(obj->buffer());
 }
 
+Handle<Value> MemorySlice::Size(const Arguments &args)
+{
+    HandleScope scope;
+    MemorySlice* obj = ObjectWrap::Unwrap<MemorySlice>(args.This());
+    return scope.Close(Number::New(obj->size()));
+}
+
 Local<Object> MemorySlice::buffer()
 {
     Buffer* buf = Buffer::New((char*)getAddress(), size(), dummy_free_callback, NULL);
@@ -112,5 +142,5 @@ Local<Object> MemorySlice::toJsBuffer(Buffer *slowBuffer)
 
     Handle<Value> constructorArgs[3] = { slowBuffer->handle_, Integer::New(this->size()), Integer::New(0) };
     Local<Object> actualBuffer = bufferConstructor->NewInstance(3, constructorArgs);
-    return actualBuffer;
+    return scope.Close(actualBuffer);
 }

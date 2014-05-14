@@ -15,6 +15,9 @@ using node::Buffer;
 class MemorySlice: public node::ObjectWrap {
 public:
     static void Init(v8::Handle<v8::Object> exports);
+    static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
+    static v8::Handle<v8::Value> NewInstance(int constructorArgc,
+                                             v8::Handle<v8::Value>* constructorArgv);
     MemorySlice(shared_memory_object& shm,
                 std::size_t offset,
                 std::size_t length,
@@ -26,11 +29,13 @@ public:
     v8::Local<v8::Object> object(v8::Local<v8::Object> handle);
 private:
     static v8::Handle<v8::Value> New(const v8::Arguments& args);
-    static v8::Handle<v8::Value> GetBuffer(const Arguments &args);
+    static v8::Handle<v8::Value> GetBuffer(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Size(const v8::Arguments &args);
     v8::Local<v8::Object> toJsBuffer(Buffer * slowBuffer);
     static v8::Persistent<v8::Function> constructor;
     Buffer* toBuffer();
     mapped_region* region_;
+
 
 };
 
